@@ -15,6 +15,11 @@
         margin: 0 auto;
         padding: 20px;
         background-color: #f9f9f9;
+        transition: border 0.3s;
+      }
+
+      body.admin-mode {
+        border-left: 5px solid #e74c3c;
       }
 
       .annotation-wall {
@@ -127,6 +132,28 @@
         border: none;
         font-size: 14px;
       }
+
+      #clear-all-btn {
+        display: none;
+        background: #e74c3c;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        margin: 20px 0;
+        width: 100%;
+        transition: background 0.3s;
+      }
+
+      #clear-all-btn:hover {
+        background: #c0392b;
+      }
+
+      #clear-all-btn i {
+        margin-right: 8px;
+      }
     </style>
   </head>
   <body>
@@ -165,6 +192,11 @@
         </button>
       </div>
 
+      <!-- Admin Clear Button -->
+      <button id="clear-all-btn">
+        <i class="fas fa-trash"></i> Clear All Comments (Admin)
+      </button>
+
       <div class="notes-container" id="notes-container">
         <!-- Notes will load here automatically -->
       </div>
@@ -198,13 +230,31 @@
       const notesContainer = document.getElementById("notes-container");
       const usernameDisplay = document.getElementById("username-display");
       const currentUserBadge = document.getElementById("current-user-display");
+      const clearAllBtn = document.getElementById("clear-all-btn");
 
       // Current user
       let currentUsername = localStorage.getItem("sdg-username") || "";
 
+      // Admin secret key (CHANGE THIS TO YOUR OWN SECRET)
+      const ADMIN_SECRET = "sdg-admin-12345";
+
       // Initialize
       if (currentUsername) {
         setUsername(currentUsername);
+      }
+
+      // Check for admin access
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("admin") === ADMIN_SECRET) {
+        // Enable admin features
+        clearAllBtn.style.display = "block";
+        document.body.classList.add("admin-mode");
+
+        // Remove secret from URL
+        window.history.replaceState({}, "", window.location.pathname);
+
+        // Set admin title
+        document.title = "[ADMIN] " + document.title;
       }
 
       // Username handling
@@ -227,7 +277,7 @@
         currentUserBadge.style.display = "inline-flex";
         noteInput.disabled = false;
         postBtn.disabled = false;
-        usernameInput.disabled = true; // Lock username after setting
+        usernameInput.disabled = true;
       }
 
       // Post note to Firebase
@@ -248,10 +298,18 @@
         }
       }
 
-      // Delete note
-      function deleteNote(noteId) {
-        db.child(noteId).remove();
-      }
+      // Delete all notes (admin only)
+      clearAllBtn.addEventListener("click", () => {
+        if (
+          confirm(
+            "WARNING: This will permanently delete ALL comments. Continue?"
+          )
+        ) {
+          db.remove()
+            .then(() => alert("All comments have been deleted!"))
+            .catch((error) => console.error("Error:", error));
+        }
+      });
 
       // Real-time listener for notes
       db.on("value", (snapshot) => {
@@ -298,7 +356,9 @@
         // Add delete handlers
         document.querySelectorAll(".delete-btn").forEach((btn) => {
           btn.addEventListener("click", (e) => {
-            deleteNote(e.currentTarget.getAttribute("data-id"));
+            if (confirm("Delete this comment?")) {
+              db.child(e.currentTarget.getAttribute("data-id")).remove();
+            }
           });
         });
       });
